@@ -1,0 +1,20 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.hamusuke.fallingattack.mixin",
+  "compatibilityLevel": "JAVA_16",
+  "mixins": [
+    "PlayerEntityMixin",
+    "ServerPlayerEntityMixin"
+  ],
+  "client": [
+    "client.MinecraftClientMixin",
+    "client.ClientPlayerEntityMixin",
+    "client.PlayerEntityModelMixin",
+    "client.HeldItemFeatureRendererMixin",
+    "client.OtherClientPlayerEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
