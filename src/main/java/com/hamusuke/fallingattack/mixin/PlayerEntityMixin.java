@@ -22,16 +22,17 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.stat.Stats;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(PlayerEntity.class)
@@ -55,13 +56,21 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
     @Shadow
     public abstract void increaseStat(Identifier stat, int amount);
 
-    private boolean fallingAttack;
-    private int fallingAttackProgress;
-
-    private float storeYaw = Float.NaN;
+    protected boolean fallingAttack;
+    protected float yPosWhenStartFallingAttack;
+    protected int fallingAttackProgress;
+    protected int fallingAttackCooldown;
+    protected float storeYaw = Float.NaN;
 
     protected PlayerEntityMixin(EntityType<? extends LivingEntity> entityType, World world) {
         super(entityType, world);
+    }
+
+    @Inject(method = "tick", at = @At("HEAD"))
+    void tickV(CallbackInfo ci) {
+        if (!this.isUsingFallingAttack() && this.fallingAttackCooldown > 0) {
+            this.fallingAttackCooldown--;
+        }
     }
 
     @Inject(method = "tickMovement", at = @At("HEAD"))
@@ -70,18 +79,38 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
             if (this.fallingAttackProgress < FIRST_FALLING_ATTACK_PROGRESS_TICKS) {
                 if (this.fallingAttackProgress == 0) {
                     this.setVelocity(new Vec3d(0.0D, 0.5D, 0.0D));
-                } else if(this.fallingAttackProgress > FIRST_FALLING_ATTACK_PROGRESS_TICKS / 2) {
+                } else if (this.fallingAttackProgress > FIRST_FALLING_ATTACK_PROGRESS_TICKS / 2) {
                     this.setVelocity(Vec3d.ZERO);
                 }
+
+                if (this.fallingAttackProgress == FIRST_FALLING_ATTACK_PROGRESS_TICKS - 1) {
+                    this.yPosWhenStartFallingAttack = (float) this.getY();
+                }
+
                 this.fallingAttackProgress++;
             } else if (this.fallingAttackProgress == FIRST_FALLING_ATTACK_PROGRESS_TICKS) {
                 if (this.isTouchingWater() || this.isInLava() || this.world.getBottomY() > this.getBlockY()) {
                     this.stopFallingAttack();
-                    this.setVelocity(0.0D, 0.0D, 0.0D);
+                    this.setVelocity(Vec3d.ZERO);
                 } else if (this.onGround) {
                     this.fallingAttackProgress++;
                     if (EnchantmentHelper.getLevel(FallingAttack.FALLING_ATTACK, this.getMainHandStack()) > 0) {
-                        this.world.getEntitiesByClass(LivingEntity.class, this.getBoundingBox().expand(3.0D, 2.0D, 3.0D), livingEntity -> !livingEntity.isSpectator() && livingEntity != this).forEach(this::fallingAttack);
+                        Box box = this.getBoundingBox().expand(3.0D, 0.0D, 3.0D);
+                        Vec3d vec3d = this.getPos();
+
+                        this.world.getEntitiesByClass(LivingEntity.class, new Box(box.minX, box.minY, box.minZ, box.maxX, box.maxY - 1.0D, box.maxZ), livingEntity -> {
+                            boolean flag = !livingEntity.isSpectator() && livingEntity != this;
+
+                            for (int i = 0; i < 2 && flag; i++) {
+                                Vec3d vec3d1 = new Vec3d(livingEntity.getX(), livingEntity.getBodyY(0.5D * (double) i), livingEntity.getZ());
+                                HitResult hitResult = this.world.raycast(new RaycastContext(vec3d, vec3d1, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, this));
+                                if (hitResult.getType() == HitResult.Type.MISS) {
+                                    return true;
+                                }
+                            }
+
+                            return false;
+                        }).forEach(this::fallingAttack);
                     }
                 } else {
                     this.setVelocity(0.0D, -3.0D, 0.0D);
@@ -94,14 +123,23 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
         }
     }
 
-    @ModifyVariable(method = "handleFallDamage", at = @At("HEAD"), ordinal = 0)
-    public float modifyFallDistance(float fallDistance) {
+    protected int computeFallDamage(float fallDistance, float damageMultiplier) {
+        int damage = super.computeFallDamage(fallDistance, damageMultiplier);
         int level = EnchantmentHelper.getEquipmentLevel(FallingAttack.FALLING_ATTACK, this);
-        return this.isUsingFallingAttack() && level > 0 ? (0.5F / level) * fallDistance : fallDistance;
+        return this.isUsingFallingAttack() && level > 0 ? (int) (damage * (0.5F / level)) : damage;
     }
 
-    private float computeFallingAttackDamage(int fallingAttackEnchantmentLevel) {
-        return this.fallDistance * 1.125F * fallingAttackEnchantmentLevel;
+    protected float computeFallingAttackDistance() {
+        return MathHelper.clamp(this.yPosWhenStartFallingAttack - (float) this.getY(), 0.0F, Float.MAX_VALUE);
+    }
+
+    protected float computeFallingAttackDamage(float distanceToTarget, int fallingAttackEnchantmentLevel) {
+        float damage = (this.computeFallingAttackDistance() - distanceToTarget) * 0.1F * fallingAttackEnchantmentLevel;
+        return MathHelper.clamp(damage, 0.0F, Float.MAX_VALUE);
+    }
+
+    protected float computeKnockbackStrength(float distanceToTarget, int fallingAttackEnchantmentLevel) {
+        return MathHelper.clamp((this.computeFallingAttackDistance() - distanceToTarget) * 0.025F * fallingAttackEnchantmentLevel, 0.0F, Float.MAX_VALUE);
     }
 
     public void fallingAttack(Entity target) {
@@ -117,8 +155,9 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
 
                 this.resetLastAttackedTicks();
                 if (damageAmount > 0.0F || attackDamage > 0.0F) {
+                    float distanceToTarget = this.distanceTo(target);
                     int fallingAttackLevel = EnchantmentHelper.getLevel(FallingAttack.FALLING_ATTACK, this.getMainHandStack());
-                    attackDamage += this.computeFallingAttackDamage(fallingAttackLevel);
+                    attackDamage += this.computeFallingAttackDamage(distanceToTarget, fallingAttackLevel);
                     this.world.playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.ENTITY_PLAYER_ATTACK_KNOCKBACK, this.getSoundCategory(), 1.0F, 1.0F);
                     ++fallingAttackLevel;
 
@@ -143,11 +182,12 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
                     boolean tookDamage = target.damage(DamageSource.player((PlayerEntity) (Object) this), damageAmount);
                     if (tookDamage) {
                         if (fallingAttackLevel > 0) {
-                            float yaw = (float) MathHelper.atan2(target.getX() - this.getX(), target.getZ() - this.getZ()) * 57.2957795F;
+                            float yaw = (float) -MathHelper.atan2(target.getX() - this.getX(), target.getZ() - this.getZ()) * 57.2957795F;
+                            float strength = this.computeKnockbackStrength(distanceToTarget, fallingAttackLevel);
                             if (target instanceof LivingEntity) {
-                                ((LivingEntity) target).takeKnockback((float) fallingAttackLevel * 0.5F, -MathHelper.sin(yaw * 0.017453292F), -MathHelper.cos(yaw * 0.017453292F));
+                                ((LivingEntity) target).takeKnockback(strength, MathHelper.sin(yaw * 0.017453292F), -MathHelper.cos(yaw * 0.017453292F));
                             } else {
-                                target.addVelocity(-MathHelper.sin(yaw * 0.017453292F) * (float) fallingAttackLevel * 0.5F, 0.1D, MathHelper.cos(yaw * 0.017453292F) * (float) fallingAttackLevel * 0.5F);
+                                target.addVelocity(-MathHelper.sin(yaw * 0.017453292F) * strength, 0.1D, MathHelper.cos(yaw * 0.017453292F) * strength);
                             }
 
                             this.setVelocity(this.getVelocity().multiply(0.6D, 1.0D, 0.6D));
@@ -214,17 +254,8 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
     }
 
     public boolean checkFallingAttack() {
-        Box b = this.getBoundingBox();
-        if (this.world.isSpaceEmpty(this, b.withMinY(b.minY - 2.0D)) && !this.isClimbing() && !this.hasVehicle() && !this.isFallFlying() && !this.abilities.flying && !this.hasNoGravity() && !this.onGround && !this.isUsingFallingAttack() && !this.isInLava() && !this.isTouchingWater() && !this.hasStatusEffect(StatusEffects.LEVITATION)) {
-            ItemStack itemStack = this.getMainHandStack();
-            if (EnchantmentHelper.getLevel(FallingAttack.FALLING_ATTACK, itemStack) > 0) {
-                this.startFallingAttack();
-                return true;
-            }
-        }
-
-        this.stopFallingAttack();
-        return false;
+        Box box = this.getBoundingBox();
+        return this.fallingAttackCooldown == 0 && this.world.isSpaceEmpty(this, new Box(box.minX, box.minY - 2.0D, box.minZ, box.maxX, box.maxY, box.maxZ)) && !this.isClimbing() && !this.hasPassengers() && !this.isFallFlying() && !this.abilities.flying && !this.hasNoGravity() && !this.onGround && !this.isUsingFallingAttack() && !this.isInLava() && !this.isTouchingWater() && !this.hasStatusEffect(StatusEffects.LEVITATION) && EnchantmentHelper.getLevel(FallingAttack.FALLING_ATTACK, this.getMainHandStack()) > 0;
     }
 
     public void startFallingAttack() {
@@ -234,6 +265,8 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
     public void stopFallingAttack() {
         this.fallingAttack = false;
         this.fallingAttackProgress = 0;
+        this.fallingAttackCooldown = 20;
+        this.yPosWhenStartFallingAttack = 0.0F;
     }
 
     public int getFallingAttackProgress() {

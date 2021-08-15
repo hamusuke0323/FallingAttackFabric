@@ -29,10 +29,11 @@ public abstract class MinecraftClientMixin {
         if (!invoker.isUsingFallingAttack()) {
             ItemStack itemStack = this.player.getMainHandStack();
             if (EnchantmentHelper.getLevel(FallingAttack.FALLING_ATTACK, itemStack) > 0 && ((PlayerEntityInvoker) this.player).checkFallingAttack()) {
+                invoker.sendFallingAttackPacket(true);
                 ci.cancel();
             }
         } else if (invoker.isUsingFallingAttack()) {
-            invoker.stopFallingAttack();
+            invoker.sendFallingAttackPacket(false);
         }
     }
 }

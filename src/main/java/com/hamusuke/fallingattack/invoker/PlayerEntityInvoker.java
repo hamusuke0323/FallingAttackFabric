@@ -25,10 +25,7 @@ public interface PlayerEntityInvoker {
         return false;
     }
 
-    default void sendStartFallingAttackPacket() {
-    }
-
-    default void sendStopFallingAttackPacket() {
+    default void sendFallingAttackPacket(boolean start) {
     }
 
     default float getYawF() {

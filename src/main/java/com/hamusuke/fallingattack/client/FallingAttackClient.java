@@ -12,25 +12,14 @@ import net.minecraft.entity.Entity;
 @Environment(EnvType.CLIENT)
 public class FallingAttackClient implements ClientModInitializer {
     public void onInitializeClient() {
-        ClientPlayNetworking.registerGlobalReceiver(NetworkManager.START_FALLING_ATTACK_PACKET_ID, (client, handler, buf, responseSender) -> {
+        ClientPlayNetworking.registerGlobalReceiver(NetworkManager.FALLING_ATTACK_S2C_PACKET_ID, (client, handler, buf, responseSender) -> {
             Entity entity = client.world.getEntityById(buf.readVarInt());
 
             if (entity instanceof AbstractClientPlayerEntity abstractClientPlayerEntity) {
                 PlayerEntityInvoker invoker = (PlayerEntityInvoker) abstractClientPlayerEntity;
-
-                if (!invoker.isUsingFallingAttack()) {
+                if (buf.readBoolean()) {
                     invoker.startFallingAttack();
-                }
-            }
-        });
-
-        ClientPlayNetworking.registerGlobalReceiver(NetworkManager.STOP_FALLING_ATTACK_PACKET_ID, (client, handler, buf, responseSender) -> {
-            Entity entity = client.world.getEntityById(buf.readVarInt());
-
-            if (entity instanceof AbstractClientPlayerEntity abstractClientPlayerEntity) {
-                PlayerEntityInvoker invoker = (PlayerEntityInvoker) abstractClientPlayerEntity;
-
-                if (invoker.isUsingFallingAttack()) {
+                } else {
                     invoker.stopFallingAttack();
                 }
             }

@@ -9,6 +9,7 @@ import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.network.packet.c2s.play.CustomPayloadC2SPacket;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Final;
@@ -26,21 +27,9 @@ public abstract class ClientPlayerEntityMixin extends PlayerEntityMixin {
         super(entityType, world);
     }
 
-    public void startFallingAttack() {
-        super.startFallingAttack();
-        this.sendStartFallingAttackPacket();
-    }
-
-    public void stopFallingAttack() {
-        super.stopFallingAttack();
-        this.sendStopFallingAttackPacket();
-    }
-
-    public void sendStartFallingAttackPacket() {
-        this.networkHandler.sendPacket(new CustomPayloadC2SPacket(NetworkManager.START_FALLING_ATTACK_PACKET_ID, PacketByteBufs.empty()));
-    }
-
-    public void sendStopFallingAttackPacket() {
-        this.networkHandler.sendPacket(new CustomPayloadC2SPacket(NetworkManager.STOP_FALLING_ATTACK_PACKET_ID, PacketByteBufs.empty()));
+    public void sendFallingAttackPacket(boolean start) {
+        PacketByteBuf packetByteBuf = PacketByteBufs.create();
+        packetByteBuf.writeBoolean(start);
+        this.networkHandler.sendPacket(new CustomPayloadC2SPacket(NetworkManager.FALLING_ATTACK_C2S_PACKET_ID, packetByteBuf));
     }
 }

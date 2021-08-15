@@ -23,23 +23,12 @@ public abstract class ServerPlayerEntityMixin extends PlayerEntityMixin {
         super(entityType, world);
     }
 
-    public void sendStartFallingAttackPacket() {
+    public void sendFallingAttackPacket(boolean start) {
         PacketByteBuf packetByteBuf = PacketByteBufs.create();
         packetByteBuf.writeVarInt(this.getId());
+        packetByteBuf.writeBoolean(start);
         this.server.getPlayerManager().getPlayerList().forEach(serverPlayerEntity -> {
-            if (serverPlayerEntity != (ServerPlayerEntity) (Object) this) {
-                serverPlayerEntity.networkHandler.sendPacket(new CustomPayloadS2CPacket(NetworkManager.START_FALLING_ATTACK_PACKET_ID, packetByteBuf));
-            }
-        });
-    }
-
-    public void sendStopFallingAttackPacket() {
-        PacketByteBuf packetByteBuf = PacketByteBufs.create();
-        packetByteBuf.writeVarInt(this.getId());
-        this.server.getPlayerManager().getPlayerList().forEach(serverPlayerEntity -> {
-            if (serverPlayerEntity != (ServerPlayerEntity) (Object) this) {
-                serverPlayerEntity.networkHandler.sendPacket(new CustomPayloadS2CPacket(NetworkManager.STOP_FALLING_ATTACK_PACKET_ID, packetByteBuf));
-            }
+            serverPlayerEntity.networkHandler.sendPacket(new CustomPayloadS2CPacket(NetworkManager.FALLING_ATTACK_S2C_PACKET_ID, packetByteBuf));
         });
     }
 }
