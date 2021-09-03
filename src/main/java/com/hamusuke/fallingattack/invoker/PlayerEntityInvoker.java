@@ -21,11 +21,21 @@ public interface PlayerEntityInvoker {
     default void setFallingAttackProgress(int progress) {
     }
 
+    default float getFallingAttackYPos() {
+        return 0.0F;
+    }
+
+    default void setFallingAttackYPos(float yPos) {
+    }
+
     default boolean isUsingFallingAttack() {
         return false;
     }
 
     default void sendFallingAttackPacket(boolean start) {
+    }
+
+    default void sendSynchronizeFallingAttackPacket() {
     }
 
     default float getYawF() {

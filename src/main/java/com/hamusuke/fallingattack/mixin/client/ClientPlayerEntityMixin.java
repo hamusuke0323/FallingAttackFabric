@@ -32,4 +32,8 @@ public abstract class ClientPlayerEntityMixin extends PlayerEntityMixin {
         packetByteBuf.writeBoolean(start);
         this.networkHandler.sendPacket(new CustomPayloadC2SPacket(NetworkManager.FALLING_ATTACK_C2S_PACKET_ID, packetByteBuf));
     }
+
+    public void sendSynchronizeFallingAttackPacket() {
+        this.networkHandler.sendPacket(new CustomPayloadC2SPacket(NetworkManager.SYNCHRONIZE_FALLING_ATTACK_C2S_PACKET_ID, PacketByteBufs.empty()));
+    }
 }

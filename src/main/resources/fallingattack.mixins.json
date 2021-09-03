@@ -12,7 +12,8 @@
     "client.ClientPlayerEntityMixin",
     "client.PlayerEntityModelMixin",
     "client.HeldItemFeatureRendererMixin",
-    "client.OtherClientPlayerEntityMixin"
+    "client.OtherClientPlayerEntityMixin",
+    "client.ClientPlayNetworkHandlerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

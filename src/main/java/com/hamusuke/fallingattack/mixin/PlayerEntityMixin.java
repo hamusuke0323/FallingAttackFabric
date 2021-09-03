@@ -56,6 +56,9 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
     @Shadow
     public abstract void increaseStat(Identifier stat, int amount);
 
+    @Shadow
+    public abstract void stopFallFlying();
+
     protected boolean fallingAttack;
     protected float yPosWhenStartFallingAttack;
     protected int fallingAttackProgress;
@@ -94,7 +97,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
                     this.setVelocity(Vec3d.ZERO);
                 } else if (this.onGround) {
                     this.fallingAttackProgress++;
-                    if (EnchantmentHelper.getLevel(FallingAttack.FALLING_ATTACK, this.getMainHandStack()) > 0) {
+                    if (!this.world.isClient() && EnchantmentHelper.getLevel(FallingAttack.FALLING_ATTACK, this.getMainHandStack()) > 0) {
                         Box box = this.getBoundingBox().expand(3.0D, 0.0D, 3.0D);
                         Vec3d vec3d = this.getPos();
 
@@ -255,11 +258,22 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
 
     public boolean checkFallingAttack() {
         Box box = this.getBoundingBox();
-        return this.fallingAttackCooldown == 0 && this.world.isSpaceEmpty(this, new Box(box.minX, box.minY - 2.0D, box.minZ, box.maxX, box.maxY, box.maxZ)) && !this.isClimbing() && !this.hasPassengers() && !this.isFallFlying() && !this.abilities.flying && !this.hasNoGravity() && !this.onGround && !this.isUsingFallingAttack() && !this.isInLava() && !this.isTouchingWater() && !this.hasStatusEffect(StatusEffects.LEVITATION) && EnchantmentHelper.getLevel(FallingAttack.FALLING_ATTACK, this.getMainHandStack()) > 0;
+        return this.fallingAttackCooldown == 0 && this.world.isSpaceEmpty(this, new Box(box.minX, box.minY - 2.0D, box.minZ, box.maxX, box.maxY, box.maxZ)) && !this.isClimbing() && !this.hasPassengers() && !this.abilities.flying && !this.hasNoGravity() && !this.onGround && !this.isUsingFallingAttack() && !this.isInLava() && !this.isTouchingWater() && !this.hasStatusEffect(StatusEffects.LEVITATION) && EnchantmentHelper.getLevel(FallingAttack.FALLING_ATTACK, this.getMainHandStack()) > 0;
     }
 
     public void startFallingAttack() {
         this.fallingAttack = true;
+
+        if (this.isFallFlying()) {
+            this.stopFallFlying();
+        }
+    }
+
+    @Inject(method = "startFallFlying", at = @At("HEAD"), cancellable = true)
+    private void startFallFlying(CallbackInfo ci) {
+        if (this.fallingAttack) {
+            ci.cancel();
+        }
     }
 
     public void stopFallingAttack() {
@@ -275,6 +289,14 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
 
     public void setFallingAttackProgress(int fallingAttackProgress) {
         this.fallingAttackProgress = fallingAttackProgress;
+    }
+
+    public float getFallingAttackYPos() {
+        return this.yPosWhenStartFallingAttack;
+    }
+
+    public void setFallingAttackYPos(float yPos) {
+        this.yPosWhenStartFallingAttack = yPos;
     }
 
     public boolean isUsingFallingAttack() {

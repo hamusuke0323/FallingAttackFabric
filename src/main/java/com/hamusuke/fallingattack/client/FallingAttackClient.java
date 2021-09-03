@@ -24,5 +24,15 @@ public class FallingAttackClient implements ClientModInitializer {
                 }
             }
         });
+
+        ClientPlayNetworking.registerGlobalReceiver(NetworkManager.SYNCHRONIZE_FALLING_ATTACK_S2C_PACKET_ID, (client, handler, buf, responseSender) -> {
+            PlayerEntityInvoker invoker = (PlayerEntityInvoker) client.player;
+            if (buf.readBoolean()) {
+                invoker.startFallingAttack();
+                invoker.setFallingAttackYPos(buf.readFloat());
+                invoker.setFallingAttackProgress(buf.readInt());
+                invoker.setYawF(buf.readFloat());
+            }
+        });
     }
 }

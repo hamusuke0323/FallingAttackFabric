@@ -29,5 +29,9 @@ public class FallingAttack implements ModInitializer {
                 invoker.sendFallingAttackPacket(false);
             }
         });
+
+        ServerPlayNetworking.registerGlobalReceiver(NetworkManager.SYNCHRONIZE_FALLING_ATTACK_C2S_PACKET_ID, (server, player, handler, buf, responseSender) -> {
+            ((PlayerEntityInvoker) player).sendSynchronizeFallingAttackPacket();
+        });
     }
 }
