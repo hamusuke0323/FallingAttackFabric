@@ -1,6 +1,6 @@
 package com.hamusuke.fallingattack;
 
-import com.hamusuke.fallingattack.enchantment.FallingAttackEnchantment;
+import com.hamusuke.fallingattack.enchantment.SharpnessOfFallingAttackEnchantment;
 import com.hamusuke.fallingattack.invoker.PlayerEntityInvoker;
 import com.hamusuke.fallingattack.network.NetworkManager;
 import net.fabricmc.api.ModInitializer;
@@ -14,7 +14,7 @@ import net.minecraft.util.registry.Registry;
 //TODO effect
 public class FallingAttack implements ModInitializer {
     public static final String MOD_ID = "fallingattack";
-    public static final Enchantment FALLING_ATTACK = Registry.register(Registry.ENCHANTMENT, new Identifier(MOD_ID, "falling_attack"), new FallingAttackEnchantment());
+    public static final Enchantment SHARPNESS_OF_FALLING_ATTACK = Registry.register(Registry.ENCHANTMENT, new Identifier(MOD_ID, "falling_attack"), new SharpnessOfFallingAttackEnchantment());
 
     public void onInitialize() {
         ServerPlayNetworking.registerGlobalReceiver(NetworkManager.FALLING_ATTACK_C2S_PACKET_ID, (server, player, handler, buf, responseSender) -> {

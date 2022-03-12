@@ -21,7 +21,7 @@ public abstract class PlayerEntityModelMixin<T extends LivingEntity> extends Bip
         super(root);
     }
 
-    @Inject(method = "setAngles", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/entity/model/BipedEntityModel;setAngles(Lnet/minecraft/entity/LivingEntity;FFFFF)V", shift = At.Shift.AFTER), cancellable = true)
+    @Inject(method = "setAngles*", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/entity/model/BipedEntityModel;setAngles(Lnet/minecraft/entity/LivingEntity;FFFFF)V", shift = At.Shift.AFTER), cancellable = true)
     void setAngles(T livingEntity, float f, float g, float h, float i, float j, CallbackInfo ci) {
         if (livingEntity instanceof AbstractClientPlayerEntity abstractClientPlayerEntity) {
             PlayerEntityInvoker invoker = (PlayerEntityInvoker) abstractClientPlayerEntity;
@@ -34,8 +34,8 @@ public abstract class PlayerEntityModelMixin<T extends LivingEntity> extends Bip
                     abstractClientPlayerEntity.bodyYaw = invoker.getYawF() + 36.0F * invoker.getFallingAttackProgress() * (livingEntity.getMainArm() == Arm.LEFT ? 1 : -1);
                     abstractClientPlayerEntity.headYaw = abstractClientPlayerEntity.bodyYaw;
                 } else {
-                    this.getArm(livingEntity.getMainArm()).pitch = -85.0F * 0.017453292F;
-                    this.getArm(livingEntity.getMainArm().getOpposite()).pitch = 80.0F * 0.017453292F;
+                    this.getArm(livingEntity.getMainArm()).pitch = (float) (-85.0F * Math.PI / 180.0F);
+                    this.getArm(livingEntity.getMainArm().getOpposite()).pitch = (float) (80.0F * Math.PI / 180.0F);
                 }
             } else if (!Float.isNaN(invoker.getYawF())) {
                 invoker.setYawF(Float.NaN);

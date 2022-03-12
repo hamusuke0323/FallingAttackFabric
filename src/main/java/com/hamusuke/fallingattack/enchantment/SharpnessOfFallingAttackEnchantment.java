@@ -4,8 +4,8 @@ import net.minecraft.enchantment.Enchantment;
 import net.minecraft.enchantment.EnchantmentTarget;
 import net.minecraft.entity.EquipmentSlot;
 
-public class FallingAttackEnchantment extends Enchantment {
-    public FallingAttackEnchantment() {
+public class SharpnessOfFallingAttackEnchantment extends Enchantment {
+    public SharpnessOfFallingAttackEnchantment() {
         super(Rarity.RARE, EnchantmentTarget.WEAPON, new EquipmentSlot[]{EquipmentSlot.MAINHAND});
     }
 
