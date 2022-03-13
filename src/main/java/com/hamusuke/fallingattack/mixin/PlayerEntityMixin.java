@@ -16,11 +16,14 @@ import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerAbilities;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.SwordItem;
 import net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
+import net.minecraft.stat.Stat;
 import net.minecraft.stat.Stats;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
@@ -58,6 +61,9 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
 
     @Shadow
     public abstract void stopFallFlying();
+
+    @Shadow
+    public abstract void increaseStat(Stat<?> stat, int amount);
 
     protected boolean fallingAttack;
     protected float yPosWhenStartFallingAttack;
@@ -98,8 +104,9 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
                 } else if (this.onGround) {
                     this.fallingAttackProgress++;
                     if (!this.world.isClient() && (Object) this instanceof ServerPlayerEntity serverPlayer) {
+                        this.world.playSoundFromEntity(null, this, SoundEvents.ENTITY_GENERIC_EXPLODE, SoundCategory.BLOCKS, 1.0F, 1.0F);
                         float d = this.computeFallingAttackDistance();
-                        Box box = this.getBoundingBox().expand(8.0D * d, 0.0D, 8.0D * d);
+                        Box box = this.getBoundingBox().expand(8.0D * d * 0.1D, 0.0D, 8.0D * d * 0.1D);
                         ((ServerWorldInvoker) this.world).summonShockWave(new FallingAttackShockWave(serverPlayer, new Box(box.minX, box.minY, box.minZ, box.maxX, box.minY + 0.85D, box.maxZ), this::fallingAttack));
                     }
                 } else {
@@ -244,7 +251,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
 
     public boolean checkFallingAttack() {
         Box box = this.getBoundingBox();
-        return this.fallingAttackCooldown <= 0 && this.world.isSpaceEmpty(this, new Box(box.minX, box.minY - 2.0D, box.minZ, box.maxX, box.maxY, box.maxZ)) && !this.isClimbing() && !this.hasPassengers() && !this.abilities.flying && !this.hasNoGravity() && !this.onGround && !this.isUsingFallingAttack() && !this.isInLava() && !this.isTouchingWater() && !this.hasStatusEffect(StatusEffects.LEVITATION);
+        return this.fallingAttackCooldown <= 0 && this.world.isSpaceEmpty(this, new Box(box.minX, box.minY - 2.0D, box.minZ, box.maxX, box.maxY, box.maxZ)) && !this.isClimbing() && !this.hasPassengers() && !this.abilities.flying && !this.hasNoGravity() && !this.onGround && !this.isUsingFallingAttack() && !this.isInLava() && !this.isTouchingWater() && !this.hasStatusEffect(StatusEffects.LEVITATION) && this.getMainHandStack().getItem() instanceof SwordItem;
     }
 
     public void startFallingAttack() {
@@ -265,7 +272,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
     public void stopFallingAttack() {
         this.fallingAttack = false;
         this.fallingAttackProgress = 0;
-        this.fallingAttackCooldown = 10;
+        this.fallingAttackCooldown = 5;
         this.yPosWhenStartFallingAttack = 0.0F;
     }
 

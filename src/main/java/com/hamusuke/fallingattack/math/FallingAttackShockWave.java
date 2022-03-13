@@ -1,17 +1,21 @@
 package com.hamusuke.fallingattack.math;
 
 import com.google.common.collect.Lists;
+import com.hamusuke.fallingattack.FallingAttack;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.RaycastContext;
 
 import java.util.List;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 public class FallingAttackShockWave {
     private final ServerPlayerEntity player;
@@ -31,7 +35,7 @@ public class FallingAttackShockWave {
         this.box = box;
         this.world = this.player.getServerWorld();
         this.primary = new Circle(this.pos.getX(), this.pos.getZ(), 0.0D);
-        this.secondary = new Circle(this.pos.getX(), this.pos.getZ(), -0.4D);
+        this.secondary = new Circle(this.pos.getX(), this.pos.getZ(), -MathHelper.SQUARE_ROOT_OF_TWO * FallingAttack.SHOCK_WAVE_SPREADING_SPEED);
         this.attackFunc = attackFunc;
     }
 
@@ -43,8 +47,9 @@ public class FallingAttackShockWave {
 
     public void tick() {
         if (!this.isDead) {
-            this.primary.spread(0.4D);
-            this.secondary.spread(0.4D);
+            this.primary.spread(FallingAttack.SHOCK_WAVE_SPREADING_SPEED);
+            this.forEachVec2d(vec2d -> this.world.spawnParticles(ParticleTypes.EXPLOSION.getType(), vec2d.x(), this.pos.y, vec2d.y(), 1, 1.0D, 0.0D, 0.0D, 1.0D), 6);
+            this.secondary.spread(FallingAttack.SHOCK_WAVE_SPREADING_SPEED);
             this.getEntitiesStruckByShockWave().forEach(livingEntity -> {
                 this.attackFunc.accept(livingEntity, (float) ((this.box.getXLength() - this.primary.getRadius()) / this.box.getXLength()));
                 this.addExceptEntity(livingEntity);
@@ -52,6 +57,14 @@ public class FallingAttackShockWave {
 
             if (this.primary.getRadius() >= this.box.getXLength()) {
                 this.isDead = true;
+            }
+        }
+    }
+
+    public void forEachVec2d(Consumer<Vec2d> consumer, int slices) {
+        for (int i = 0; i < 360; i++) {
+            if (i % slices == 0) {
+                consumer.accept(this.primary.getCoordinates((float) (i * Math.PI / 180.0F), true));
             }
         }
     }
