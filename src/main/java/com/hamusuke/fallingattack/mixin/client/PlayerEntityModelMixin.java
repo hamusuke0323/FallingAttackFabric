@@ -21,7 +21,7 @@ public abstract class PlayerEntityModelMixin<T extends LivingEntity> extends Bip
         super(root);
     }
 
-    @Inject(method = "setAngles*", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/entity/model/BipedEntityModel;setAngles(Lnet/minecraft/entity/LivingEntity;FFFFF)V", shift = At.Shift.AFTER), cancellable = true)
+    @Inject(method = "setAngles*", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/entity/model/BipedEntityModel;setAngles(Lnet/minecraft/entity/LivingEntity;FFFFF)V", shift = At.Shift.AFTER))
     void setAngles(T livingEntity, float f, float g, float h, float i, float j, CallbackInfo ci) {
         if (livingEntity instanceof AbstractClientPlayerEntity abstractClientPlayerEntity) {
             PlayerEntityInvoker invoker = (PlayerEntityInvoker) abstractClientPlayerEntity;

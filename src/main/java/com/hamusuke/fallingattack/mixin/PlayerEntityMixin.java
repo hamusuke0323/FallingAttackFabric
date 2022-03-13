@@ -2,6 +2,8 @@ package com.hamusuke.fallingattack.mixin;
 
 import com.hamusuke.fallingattack.FallingAttack;
 import com.hamusuke.fallingattack.invoker.PlayerEntityInvoker;
+import com.hamusuke.fallingattack.invoker.ServerWorldInvoker;
+import com.hamusuke.fallingattack.math.FallingAttackShockWave;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityGroup;
@@ -22,11 +24,9 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.stat.Stats;
 import net.minecraft.util.Hand;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.RaycastContext;
 import net.minecraft.world.World;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -97,23 +97,10 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
                     this.setVelocity(Vec3d.ZERO);
                 } else if (this.onGround) {
                     this.fallingAttackProgress++;
-                    if (!this.world.isClient()) {
-                        Box box = this.getBoundingBox().expand(3.0D, 0.0D, 3.0D);
-                        Vec3d vec3d = this.getPos();
-
-                        this.world.getEntitiesByClass(LivingEntity.class, new Box(box.minX, box.minY, box.minZ, box.maxX, box.maxY - 1.0D, box.maxZ), livingEntity -> {
-                            boolean flag = !livingEntity.isSpectator() && livingEntity != this;
-
-                            for (int i = 0; i < 2 && flag; i++) {
-                                Vec3d vec3d1 = new Vec3d(livingEntity.getX(), livingEntity.getBodyY(0.5D * (double) i), livingEntity.getZ());
-                                HitResult hitResult = this.world.raycast(new RaycastContext(vec3d, vec3d1, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, this));
-                                if (hitResult.getType() == HitResult.Type.MISS) {
-                                    return true;
-                                }
-                            }
-
-                            return false;
-                        }).forEach(this::fallingAttack);
+                    if (!this.world.isClient() && (Object) this instanceof ServerPlayerEntity serverPlayer) {
+                        float d = this.computeFallingAttackDistance();
+                        Box box = this.getBoundingBox().expand(8.0D * d, 0.0D, 8.0D * d);
+                        ((ServerWorldInvoker) this.world).summonShockWave(new FallingAttackShockWave(serverPlayer, new Box(box.minX, box.minY, box.minZ, box.maxX, box.minY + 0.85D, box.maxZ), this::fallingAttack));
                     }
                 } else {
                     this.setVelocity(0.0D, -3.0D, 0.0D);
@@ -128,7 +115,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
 
     protected int computeFallDamage(float fallDistance, float damageMultiplier) {
         int damage = super.computeFallDamage(fallDistance, damageMultiplier);
-        return this.isUsingFallingAttack() ? (int) (damage * 0.25F) : damage;
+        return this.isUsingFallingAttack() ? MathHelper.floor(damage * 0.1F) : damage;
     }
 
     protected float computeFallingAttackDistance() {
@@ -144,7 +131,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
         return MathHelper.clamp((this.computeFallingAttackDistance() - distanceToTarget) * 0.025F * fallingAttackEnchantmentLevel, 0.0F, Float.MAX_VALUE);
     }
 
-    public void fallingAttack(Entity target) {
+    public void fallingAttack(Entity target, float damageModifier) {
         if (target.isAttackable()) {
             if (!target.handleAttack(this)) {
                 float damageAmount = (float) this.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE);
@@ -158,8 +145,8 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
                 this.resetLastAttackedTicks();
                 if (damageAmount > 0.0F || attackDamage > 0.0F) {
                     float distanceToTarget = this.distanceTo(target);
-                    int fallingAttackLevel = EnchantmentHelper.getLevel(FallingAttack.SHARPNESS_OF_FALLING_ATTACK, this.getMainHandStack());
-                    fallingAttackLevel = MathHelper.clamp(fallingAttackLevel + 1, 1, FallingAttack.SHARPNESS_OF_FALLING_ATTACK.getMaxLevel() + 1);
+                    int fallingAttackLevel = EnchantmentHelper.getLevel(FallingAttack.SHARPNESS_OF_FALLING_ATTACK, this.getMainHandStack()) + 1;
+                    fallingAttackLevel = MathHelper.clamp(fallingAttackLevel, 1, 255);
                     attackDamage += this.computeFallingAttackDamage(distanceToTarget, fallingAttackLevel);
                     this.world.playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.ENTITY_PLAYER_ATTACK_KNOCKBACK, this.getSoundCategory(), 1.0F, 1.0F);
 
@@ -181,7 +168,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
                     }
 
                     Vec3d vec3d = target.getVelocity();
-                    boolean tookDamage = target.damage(DamageSource.player((PlayerEntity) (Object) this), damageAmount);
+                    boolean tookDamage = target.damage(DamageSource.player((PlayerEntity) (Object) this), damageAmount * damageModifier);
                     if (tookDamage) {
                         if (fallingAttackLevel > 0) {
                             float yaw = (float) -MathHelper.atan2(target.getX() - this.getX(), target.getZ() - this.getZ()) * 57.2957795F;
@@ -257,7 +244,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
 
     public boolean checkFallingAttack() {
         Box box = this.getBoundingBox();
-        return this.fallingAttackCooldown == 0 && this.world.isSpaceEmpty(this, new Box(box.minX, box.minY - 2.0D, box.minZ, box.maxX, box.maxY, box.maxZ)) && !this.isClimbing() && !this.hasPassengers() && !this.abilities.flying && !this.hasNoGravity() && !this.onGround && !this.isUsingFallingAttack() && !this.isInLava() && !this.isTouchingWater() && !this.hasStatusEffect(StatusEffects.LEVITATION) && EnchantmentHelper.getLevel(FallingAttack.SHARPNESS_OF_FALLING_ATTACK, this.getMainHandStack()) > 0;
+        return this.fallingAttackCooldown <= 0 && this.world.isSpaceEmpty(this, new Box(box.minX, box.minY - 2.0D, box.minZ, box.maxX, box.maxY, box.maxZ)) && !this.isClimbing() && !this.hasPassengers() && !this.abilities.flying && !this.hasNoGravity() && !this.onGround && !this.isUsingFallingAttack() && !this.isInLava() && !this.isTouchingWater() && !this.hasStatusEffect(StatusEffects.LEVITATION);
     }
 
     public void startFallingAttack() {
@@ -278,7 +265,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
     public void stopFallingAttack() {
         this.fallingAttack = false;
         this.fallingAttackProgress = 0;
-        this.fallingAttackCooldown = 20;
+        this.fallingAttackCooldown = 10;
         this.yPosWhenStartFallingAttack = 0.0F;
     }
 

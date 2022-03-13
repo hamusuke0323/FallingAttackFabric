@@ -5,15 +5,16 @@
   "compatibilityLevel": "JAVA_16",
   "mixins": [
     "PlayerEntityMixin",
-    "ServerPlayerEntityMixin"
+    "ServerPlayerEntityMixin",
+    "ServerWorldMixin"
   ],
   "client": [
-    "client.MinecraftClientMixin",
     "client.ClientPlayerEntityMixin",
-    "client.PlayerEntityModelMixin",
+    "client.ClientPlayNetworkHandlerMixin",
     "client.HeldItemFeatureRendererMixin",
+    "client.MinecraftClientMixin",
     "client.OtherClientPlayerEntityMixin",
-    "client.ClientPlayNetworkHandlerMixin"
+    "client.PlayerEntityModelMixin"
   ],
   "injectors": {
     "defaultRequire": 1
