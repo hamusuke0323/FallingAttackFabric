@@ -31,7 +31,7 @@ public abstract class PlayerEntityModelMixin<T extends LivingEntity> extends Bip
                         invoker.setYawF(abstractClientPlayerEntity.bodyYaw);
                     }
 
-                    abstractClientPlayerEntity.bodyYaw = invoker.getYawF() + 36.0F * invoker.getFallingAttackProgress() * (livingEntity.getMainArm() == Arm.LEFT ? 1 : -1);
+                    abstractClientPlayerEntity.bodyYaw = invoker.getYawF() + 36.0F * invoker.getFallingAttackProgress() * (livingEntity.getMainArm() == Arm.LEFT ? 1.0F : -1.0F);
                     abstractClientPlayerEntity.headYaw = abstractClientPlayerEntity.bodyYaw;
                 } else {
                     this.getArm(livingEntity.getMainArm()).pitch = (float) (-85.0F * Math.PI / 180.0F);

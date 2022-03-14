@@ -1,30 +1,23 @@
 package com.hamusuke.fallingattack.mixin;
 
-import com.hamusuke.fallingattack.FallingAttack;
 import com.hamusuke.fallingattack.invoker.PlayerEntityInvoker;
 import com.hamusuke.fallingattack.invoker.ServerWorldInvoker;
 import com.hamusuke.fallingattack.math.FallingAttackShockWave;
-import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.entity.*;
-import net.minecraft.entity.attribute.EntityAttributes;
-import net.minecraft.entity.boss.dragon.EnderDragonPart;
-import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerAbilities;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.SwordItem;
-import net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket;
-import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.stat.Stat;
 import net.minecraft.stat.Stats;
 import net.minecraft.util.Hand;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
@@ -43,19 +36,10 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
     private PlayerAbilities abilities;
 
     @Shadow
-    public abstract void addEnchantedHitParticles(Entity target);
-
-    @Shadow
     public abstract void resetLastAttackedTicks();
 
     @Shadow
-    public abstract void addCritParticles(Entity target);
-
-    @Shadow
     public abstract void addExhaustion(float exhaustion);
-
-    @Shadow
-    public abstract void increaseStat(Identifier stat, int amount);
 
     @Shadow
     public abstract void stopFallFlying();
@@ -105,7 +89,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
                     ItemStack sword = this.getMainHandStack();
                     Item item = sword.getItem();
                     if (!this.world.isClient() && (Object) this instanceof ServerPlayerEntity serverPlayer && item instanceof SwordItem) {
-                        sword.damage(1, this, e -> e.sendEquipmentBreakStatus(EquipmentSlot.MAINHAND));
+                        sword.damage(1, serverPlayer, e -> e.sendEquipmentBreakStatus(EquipmentSlot.MAINHAND));
                         this.incrementStat(Stats.USED.getOrCreateStat(item));
                         if (sword.isEmpty()) {
                             this.setStackInHand(Hand.MAIN_HAND, ItemStack.EMPTY);
@@ -120,8 +104,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
                     this.resetLastAttackedTicks();
                     this.addExhaustion(0.1F);
                 } else {
-                    Vec3d vec3d = this.getVelocity();
-                    this.setVelocity(0.0D, vec3d.y - 1.5D, 0.0D);
+                    this.setVelocity(0.0D, -3.0D, 0.0D);
                 }
             } else if (this.fallingAttackProgress < FALLING_ATTACK_END_TICKS) {
                 this.fallingAttackProgress++;
@@ -149,117 +132,6 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
         return MathHelper.clamp((this.computeFallingAttackDistance() - distanceToTarget) * 0.025F * fallingAttackEnchantmentLevel, 0.0F, Float.MAX_VALUE);
     }
 
-    public void fallingAttack(Entity target, float damageModifier) {
-        if (target.isAttackable()) {
-            if (!target.handleAttack(this)) {
-                float damageAmount = (float) this.getAttributeValue(EntityAttributes.GENERIC_ATTACK_DAMAGE);
-                float attackDamage;
-                if (target instanceof LivingEntity) {
-                    attackDamage = EnchantmentHelper.getAttackDamage(this.getMainHandStack(), ((LivingEntity) target).getGroup());
-                } else {
-                    attackDamage = EnchantmentHelper.getAttackDamage(this.getMainHandStack(), EntityGroup.DEFAULT);
-                }
-
-                this.resetLastAttackedTicks();
-                if (damageAmount > 0.0F || attackDamage > 0.0F) {
-                    float distanceToTarget = this.distanceTo(target);
-                    int fallingAttackLevel = EnchantmentHelper.getLevel(FallingAttack.SHARPNESS_OF_FALLING_ATTACK, this.getMainHandStack()) + 1;
-                    fallingAttackLevel = MathHelper.clamp(fallingAttackLevel, 1, 255);
-                    attackDamage += this.computeFallingAttackDamage(distanceToTarget, fallingAttackLevel);
-                    this.world.playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.ENTITY_PLAYER_ATTACK_KNOCKBACK, this.getSoundCategory(), 1.0F, 1.0F);
-
-                    boolean bl3 = !this.isClimbing() && !this.isTouchingWater() && !this.hasStatusEffect(StatusEffects.BLINDNESS) && !this.hasVehicle() && target instanceof LivingEntity;
-                    if (bl3) {
-                        damageAmount *= 1.5F;
-                    }
-
-                    damageAmount += attackDamage;
-                    float targetHealth = 0.0F;
-                    boolean fireAspectEnchanted = false;
-                    int fireAspectLevel = EnchantmentHelper.getFireAspect(this);
-                    if (target instanceof LivingEntity) {
-                        targetHealth = ((LivingEntity) target).getHealth();
-                        if (fireAspectLevel > 0 && !target.isOnFire()) {
-                            fireAspectEnchanted = true;
-                            target.setOnFireFor(1);
-                        }
-                    }
-
-                    Vec3d vec3d = target.getVelocity();
-                    boolean tookDamage = target.damage(DamageSource.player((PlayerEntity) (Object) this), damageAmount * damageModifier);
-                    if (tookDamage) {
-                        if (fallingAttackLevel > 0) {
-                            float yaw = (float) -MathHelper.atan2(target.getX() - this.getX(), target.getZ() - this.getZ()) * 57.2957795F;
-                            float strength = this.computeKnockbackStrength(distanceToTarget, fallingAttackLevel);
-                            if (target instanceof LivingEntity) {
-                                ((LivingEntity) target).takeKnockback(strength, MathHelper.sin(yaw * 0.017453292F), -MathHelper.cos(yaw * 0.017453292F));
-                            } else {
-                                target.addVelocity(-MathHelper.sin(yaw * 0.017453292F) * strength, 0.1D, MathHelper.cos(yaw * 0.017453292F) * strength);
-                            }
-
-                            this.setVelocity(this.getVelocity().multiply(0.6D, 1.0D, 0.6D));
-                            this.setSprinting(false);
-                        }
-
-                        if (target instanceof ServerPlayerEntity && target.velocityModified) {
-                            ((ServerPlayerEntity) target).networkHandler.sendPacket(new EntityVelocityUpdateS2CPacket(target));
-                            target.velocityModified = false;
-                            target.setVelocity(vec3d);
-                        }
-
-                        if (bl3) {
-                            this.world.playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.ENTITY_PLAYER_ATTACK_CRIT, this.getSoundCategory(), 1.0F, 1.0F);
-                            this.addCritParticles(target);
-                        }
-
-                        if (attackDamage > 0.0F) {
-                            this.addEnchantedHitParticles(target);
-                        }
-
-                        this.onAttacking(target);
-                        if (target instanceof LivingEntity) {
-                            EnchantmentHelper.onUserDamaged((LivingEntity) target, this);
-                        }
-
-                        EnchantmentHelper.onTargetDamaged(this, target);
-                        ItemStack itemStack2 = this.getMainHandStack();
-                        Entity entity = target;
-                        if (target instanceof EnderDragonPart) {
-                            entity = ((EnderDragonPart) target).owner;
-                        }
-
-                        if (!this.world.isClient && !itemStack2.isEmpty() && entity instanceof LivingEntity) {
-                            itemStack2.postHit((LivingEntity) entity, (PlayerEntity) (Object) this);
-                            if (itemStack2.isEmpty()) {
-                                this.setStackInHand(Hand.MAIN_HAND, ItemStack.EMPTY);
-                            }
-                        }
-
-                        if (target instanceof LivingEntity) {
-                            float n = targetHealth - ((LivingEntity) target).getHealth();
-                            this.increaseStat(Stats.DAMAGE_DEALT, Math.round(n * 10.0F));
-                            if (fireAspectLevel > 0) {
-                                target.setOnFireFor(fireAspectLevel * 4);
-                            }
-
-                            if (this.world instanceof ServerWorld && n > 2.0F) {
-                                int o = (int) ((double) n * 0.5D);
-                                ((ServerWorld) this.world).spawnParticles(ParticleTypes.DAMAGE_INDICATOR, target.getX(), target.getBodyY(0.5D), target.getZ(), o, 0.1D, 0.0D, 0.1D, 0.2D);
-                            }
-                        }
-
-                        this.addExhaustion(0.1F);
-                    } else {
-                        this.world.playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.ENTITY_PLAYER_ATTACK_NODAMAGE, this.getSoundCategory(), 1.0F, 1.0F);
-                        if (fireAspectEnchanted) {
-                            target.extinguish();
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     public boolean checkFallingAttack() {
         Box box = this.getBoundingBox();
         return this.fallingAttackCooldown <= 0 && this.world.isSpaceEmpty(this, new Box(box.minX, box.minY - 2.0D, box.minZ, box.maxX, box.maxY, box.maxZ)) && !this.isClimbing() && !this.hasPassengers() && !this.abilities.flying && !this.hasNoGravity() && !this.onGround && !this.isUsingFallingAttack() && !this.isInLava() && !this.isTouchingWater() && !this.hasStatusEffect(StatusEffects.LEVITATION) && this.getMainHandStack().getItem() instanceof SwordItem;
@@ -285,6 +157,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
         this.fallingAttackProgress = 0;
         this.fallingAttackCooldown = 5;
         this.yPosWhenStartFallingAttack = 0.0F;
+        this.roll = 0;
     }
 
     public int getFallingAttackProgress() {

@@ -15,7 +15,7 @@ import net.minecraft.util.registry.Registry;
 public class FallingAttack implements ModInitializer {
     public static final String MOD_ID = "fallingattack";
     public static final Enchantment SHARPNESS_OF_FALLING_ATTACK = Registry.register(Registry.ENCHANTMENT, new Identifier(MOD_ID, "falling_attack"), new SharpnessOfFallingAttackEnchantment());
-    public static final double SHOCK_WAVE_SPREADING_SPEED = 1.6D;
+    public static final double SHOCK_WAVE_SPREADING_SPEED = 34.0D / 20.0D;
 
     public void onInitialize() {
         ServerPlayNetworking.registerGlobalReceiver(NetworkManager.FALLING_ATTACK_C2S_PACKET_ID, (server, player, handler, buf, responseSender) -> {
