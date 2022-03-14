@@ -5,16 +5,14 @@ import com.hamusuke.fallingattack.invoker.PlayerEntityInvoker;
 import com.hamusuke.fallingattack.invoker.ServerWorldInvoker;
 import com.hamusuke.fallingattack.math.FallingAttackShockWave;
 import net.minecraft.enchantment.EnchantmentHelper;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityGroup;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.*;
 import net.minecraft.entity.attribute.EntityAttributes;
 import net.minecraft.entity.boss.dragon.EnderDragonPart;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.player.PlayerAbilities;
 import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.SwordItem;
 import net.minecraft.network.packet.s2c.play.EntityVelocityUpdateS2CPacket;
@@ -63,7 +61,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
     public abstract void stopFallFlying();
 
     @Shadow
-    public abstract void increaseStat(Stat<?> stat, int amount);
+    public abstract void incrementStat(Stat<?> stat);
 
     protected boolean fallingAttack;
     protected float yPosWhenStartFallingAttack;
@@ -103,14 +101,27 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
                     this.setVelocity(Vec3d.ZERO);
                 } else if (this.onGround) {
                     this.fallingAttackProgress++;
-                    if (!this.world.isClient() && (Object) this instanceof ServerPlayerEntity serverPlayer) {
+
+                    ItemStack sword = this.getMainHandStack();
+                    Item item = sword.getItem();
+                    if (!this.world.isClient() && (Object) this instanceof ServerPlayerEntity serverPlayer && item instanceof SwordItem) {
+                        sword.damage(1, this, e -> e.sendEquipmentBreakStatus(EquipmentSlot.MAINHAND));
+                        this.incrementStat(Stats.USED.getOrCreateStat(item));
+                        if (sword.isEmpty()) {
+                            this.setStackInHand(Hand.MAIN_HAND, ItemStack.EMPTY);
+                        }
+
                         this.world.playSoundFromEntity(null, this, SoundEvents.ENTITY_GENERIC_EXPLODE, SoundCategory.BLOCKS, 1.0F, 1.0F);
                         float d = this.computeFallingAttackDistance();
                         Box box = this.getBoundingBox().expand(8.0D * d * 0.1D, 0.0D, 8.0D * d * 0.1D);
-                        ((ServerWorldInvoker) this.world).summonShockWave(new FallingAttackShockWave(serverPlayer, new Box(box.minX, box.minY, box.minZ, box.maxX, box.minY + 0.85D, box.maxZ), this::fallingAttack));
+                        ((ServerWorldInvoker) this.world).summonShockWave(new FallingAttackShockWave(serverPlayer, sword, new Box(box.minX, box.minY, box.minZ, box.maxX, box.minY + 0.85D, box.maxZ), this::computeFallingAttackDamage, this::computeKnockbackStrength));
                     }
+
+                    this.resetLastAttackedTicks();
+                    this.addExhaustion(0.1F);
                 } else {
-                    this.setVelocity(0.0D, -3.0D, 0.0D);
+                    Vec3d vec3d = this.getVelocity();
+                    this.setVelocity(0.0D, vec3d.y - 1.5D, 0.0D);
                 }
             } else if (this.fallingAttackProgress < FALLING_ATTACK_END_TICKS) {
                 this.fallingAttackProgress++;
