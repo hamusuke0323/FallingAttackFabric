@@ -69,7 +69,7 @@ public abstract class PlayerEntityMixin extends LivingEntity implements PlayerEn
         if (this.isUsingFallingAttack()) {
             if (this.fallingAttackProgress < FIRST_FALLING_ATTACK_PROGRESS_TICKS) {
                 if (this.fallingAttackProgress == 0) {
-                    this.setVelocity(new Vec3d(0.0D, 0.5D, 0.0D));
+                    this.setVelocity(new Vec3d(0.0D, 1.0D, 0.0D));
                 } else if (this.fallingAttackProgress > FIRST_FALLING_ATTACK_PROGRESS_TICKS / 2) {
                     this.setVelocity(Vec3d.ZERO);
                 }
