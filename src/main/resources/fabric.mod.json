@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "fallingattack",
+  "version": "${version}",
+  "name": "Falling Attack",
+  "description": "You can use falling attack.",
+  "authors": [
+    "hamusuke2303"
+  ],
+  "license": "CC0-1.0",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "com.hamusuke.fallingattack.FallingAttack"
+    ],
+    "client": [
+      "com.hamusuke.fallingattack.client.FallingAttackClient"
+    ]
+  },
+  "mixins": [
+    "fallingattack.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.13.3",
+    "fabric": "*",
+    "minecraft": "1.18.2",
+    "java": ">=17"
+  },
+  "suggests": {
+    "another-mod": "*"
+  }
+}
